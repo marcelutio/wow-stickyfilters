@@ -5,11 +5,9 @@
 A quality-of-life addon for **World of Warcraft: Forever** (interface 16001). Trainers and merchants remember what you want to see, and every entry tells you at a glance why you can or cannot use it. Fully available in **English and German**.
 
 <p>
-  <a href="https://media.forgecdn.net/attachments/2179/6/0-png.png"><img src="https://media.forgecdn.net/attachments/2179/6/0-png.png" alt="StickyFilters0" width="180"></a>
-  <a href="https://media.forgecdn.net/attachments/2179/7/1-png.png"><img src="https://media.forgecdn.net/attachments/2179/7/1-png.png" alt="StickyFilters1" width="180"></a>
-  <a href="https://media.forgecdn.net/attachments/2179/8/2-png.png"><img src="https://media.forgecdn.net/attachments/2179/8/2-png.png" alt="StickyFilters2" width="180"></a>
-  <a href="https://media.forgecdn.net/attachments/2179/9/3-png.png"><img src="https://media.forgecdn.net/attachments/2179/9/3-png.png" alt="StickyFilters3" width="180"></a>
-  <a href="https://media.forgecdn.net/attachments/2179/10/4-png.png"><img src="https://media.forgecdn.net/attachments/2179/10/4-png.png" alt="StickyFilters4" width="180"></a>
+  <a href="https://media.forgecdn.net/attachments/2179/6/0-png.png"><img src="https://media.forgecdn.net/attachments/2179/6/0-png.png" alt="StickyFilters0" width="32%"></a><a href="https://media.forgecdn.net/attachments/2179/7/1-png.png"><img src="https://media.forgecdn.net/attachments/2179/7/1-png.png" alt="StickyFilters1" width="32%"></a><a href="https://media.forgecdn.net/attachments/2179/8/2-png.png"><img src="https://media.forgecdn.net/attachments/2179/8/2-png.png" alt="StickyFilters2" width="32%"></a>
+  <br>
+  <a href="https://media.forgecdn.net/attachments/2179/9/3-png.png"><img src="https://media.forgecdn.net/attachments/2179/9/3-png.png" alt="StickyFilters3" width="49%"></a><a href="https://media.forgecdn.net/attachments/2179/10/4-png.png"><img src="https://media.forgecdn.net/attachments/2179/10/4-png.png" alt="StickyFilters4" width="49%"></a>
 </p>
 
 Click a screenshot to see it in full size.
