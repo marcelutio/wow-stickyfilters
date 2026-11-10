@@ -12,8 +12,8 @@ A quality-of-life addon for **World of Warcraft: Forever** (interface 16001). Tr
 
 ## Why?
 
-- Trainer filters like "Already known" reset every time you close the window.
 - Vendors show recipes you already know, gear your class can never wear and items you cannot afford, all in the same red.
+- Vendors and trainers have no search, so finding one recipe or item means scrolling through every page.
 
 ## Features
 
