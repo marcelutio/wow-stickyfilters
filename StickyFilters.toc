@@ -1,0 +1,12 @@
+## Interface: 16001
+## Title: StickyFilters
+## Notes: Remembers trainer and merchant filters, color-codes entries by why you can or cannot use them, and adds search, cost hints and "fits me" check marks.
+## Notes-deDE: Merkt sich Lehrer- und Händlerfilter, färbt Einträge nach dem Grund, warum du sie (nicht) nutzen kannst, und ergänzt Suche, Kostenhinweise und "passt zu mir"-Häkchen.
+## Author: marcelutio
+## Version: @project-version@
+## X-License: MIT
+## X-Curse-Project-ID: 1796104
+## X-Website: https://www.curseforge.com/wow/addons/stickyfilters
+## SavedVariables: StickyFiltersDB
+
+StickyFilters.lua

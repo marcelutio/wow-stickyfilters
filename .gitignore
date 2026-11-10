@@ -1,0 +1,12 @@
+# Packager output and local archives
+.release/
+*.zip
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
+*.bak
+*.swp
+.vscode/
+.idea/
