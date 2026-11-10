@@ -4,6 +4,17 @@
 
 A quality-of-life addon for **World of Warcraft: Forever** (interface 16001). Trainers and merchants remember what you want to see, and every entry tells you at a glance why you can or cannot use it. Fully available in **English and German**.
 
+![StickyFilters0](https://media.forgecdn.net/attachments/2179/6/0-png.png)
+![StickyFilters1](https://media.forgecdn.net/attachments/2179/7/1-png.png)
+![StickyFilters2](https://media.forgecdn.net/attachments/2179/8/2-png.png)
+![StickyFilters3](https://media.forgecdn.net/attachments/2179/9/3-png.png)
+![StickyFilters4](https://media.forgecdn.net/attachments/2179/10/4-png.png)
+
+## Why?
+
+- Trainer filters like "Already known" reset every time you close the window.
+- Vendors show recipes you already know, gear your class can never wear and items you cannot afford, all in the same red.
+
 ## Features
 
 ### Color language (merchants and trainers)
