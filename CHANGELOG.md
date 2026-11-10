@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.1
+
+- Hint text uses neutral wording and names the full options path
+- Page hint only appears for an active search, not for range or category filters alone
+- Dimmed rows are a bit more visible (20% opacity), their coin and check mark icons 40%, trainer prices and requirement lines 30%
+
 ## 1.0.0
 
 First public release for World of Warcraft: Forever.

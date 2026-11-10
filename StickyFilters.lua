@@ -86,8 +86,8 @@ local L = {
 	SEARCH_PER_NPC = "Separate search per NPC",
 	HINT_SHOW = "Show hint",
 	HINT_NEVER = "Don't show again",
-	HINT_MERCHANT = "StickyFilters: search and filter this merchant up here. Colors and tooltips explain every item.\n\nThe filters start with my recommended settings so you only see what is relevant. Change them any time in the filter menu or under Options > AddOns.",
-	HINT_TRAINER = "StickyFilters: search and filter this trainer up here. Colors and tooltips explain every entry.\n\nThe filters start with my recommended settings so you only see what is relevant. Change them any time in the filter menu or under Options > AddOns.",
+	HINT_MERCHANT = "StickyFilters: search and filter this merchant up here. Colors and tooltips explain every item.\n\nThe filters start with the recommended settings so you only see what is relevant. Change them any time in the filter menu or under Options > AddOns > StickyFilters.",
+	HINT_TRAINER = "StickyFilters: search and filter this trainer up here. Colors and tooltips explain every entry.\n\nThe filters start with the recommended settings so you only see what is relevant. Change them any time in the filter menu or under Options > AddOns > StickyFilters.",
 	RESET_DONE = "all settings reset to defaults.",
 	OPT_TRAINER = "Trainer",
 	OPT_SEC_CATEGORIES = "Color categories (unchecked = dimmed)",
@@ -177,8 +177,8 @@ local function ApplyGerman()
 	L.SEARCH_PER_NPC = "Eigene Suche pro NPC";
 	L.HINT_SHOW = "Hinweis anzeigen";
 	L.HINT_NEVER = "Nicht mehr anzeigen";
-	L.HINT_MERCHANT = "StickyFilters: Hier oben kannst du diesen H\195\164ndler durchsuchen und filtern. Farben und Tooltips erkl\195\164ren jedes Item.\n\nDie Filter starten mit meinen empfohlenen Einstellungen, damit du nur Relevantes siehst. \195\132ndern kannst du sie jederzeit im Filter-Men\195\188 oder unter Optionen > AddOns.";
-	L.HINT_TRAINER = "StickyFilters: Hier oben kannst du diesen Lehrer durchsuchen und filtern. Farben und Tooltips erkl\195\164ren jeden Eintrag.\n\nDie Filter starten mit meinen empfohlenen Einstellungen, damit du nur Relevantes siehst. \195\132ndern kannst du sie jederzeit im Filter-Men\195\188 oder unter Optionen > AddOns.";
+	L.HINT_MERCHANT = "StickyFilters: Hier oben kannst du diesen H\195\164ndler durchsuchen und filtern. Farben und Tooltips erkl\195\164ren jedes Item.\n\nDie Filter starten mit den empfohlenen Einstellungen, damit du nur Relevantes siehst. \195\132ndern kannst du sie jederzeit im Filter-Men\195\188 oder unter Optionen > AddOns > StickyFilters.";
+	L.HINT_TRAINER = "StickyFilters: Hier oben kannst du diesen Lehrer durchsuchen und filtern. Farben und Tooltips erkl\195\164ren jeden Eintrag.\n\nDie Filter starten mit den empfohlenen Einstellungen, damit du nur Relevantes siehst. \195\132ndern kannst du sie jederzeit im Filter-Men\195\188 oder unter Optionen > AddOns > StickyFilters.";
 	L.RESET_DONE = "alle Einstellungen auf Standard zur\195\188ckgesetzt.";
 	L.OPT_TRAINER = "Lehrer";
 	L.OPT_SEC_CATEGORIES = "Farbkategorien (abgew\195\164hlt = abgedunkelt)";
@@ -721,9 +721,11 @@ end
 -- the buy/train buttons always keep Blizzard's own index mapping)
 ---------------------------------------------------------------------------
 
-local DIM_ALPHA = 0.15;
--- Our coin/check icons on dimmed rows stay 50% more visible than the row.
-local DIM_ICON_ALPHA = DIM_ALPHA * 1.5;
+local DIM_ALPHA = 0.2;
+-- Our coin/check icons on dimmed rows stay clearly visible (40% opacity).
+local DIM_ICON_ALPHA = 0.4;
+-- Trainer prices and requirement lines on dimmed rows: 10 points above the row.
+local DIM_PRICE_ALPHA = DIM_ALPHA + 0.1;
 
 local function SyncIconAlpha(button, dimmed)
 	for _, key in ipairs({ "StickyFiltersCoin", "StickyFiltersCheck" }) do
@@ -859,6 +861,14 @@ local function TintTrainerButton(skillButton, elementData)
 	end
 	skillButton:SetAlpha(visible and 1 or DIM_ALPHA);
 	SyncIconAlpha(skillButton, not visible);
+	-- Price and the requirement line ("Requires: First Aid (50)") stay a bit more
+	-- visible on dimmed rows; alpha can only be set per text line, not per word.
+	for _, price in ipairs({ skillButton.money, skillButton.alternateCost, skillButton.subText }) do
+		if price and price.SetIgnoreParentAlpha then
+			price:SetIgnoreParentAlpha(not visible);
+			price:SetAlpha(visible and 1 or DIM_PRICE_ALPHA);
+		end
+	end
 	SetMatchBorder(skillButton, icon, query ~= "" and FuzzyMatch(name, query));
 end
 
@@ -1035,14 +1045,6 @@ local function IsMerchantVisible(index, cat)
 	return info and FuzzyMatch(info.name, query) or false;
 end
 
-local function MerchantFilterActive()
-	if SearchText(merchantSearch) ~= "" or (db and (db.merchantLevelWindow or db.merchantSkillWindow)) then return true; end
-	for _, cat in ipairs(MERCHANT_CATS) do
-		if not IsShownCategory("merchantShow", cat) then return true; end
-	end
-	return false;
-end
-
 -- dim = Blizzard's darker variant (sold out); name frame is always half as bright.
 local function Tint(i, color, dim)
 	local r, g, b = color[1], color[2], color[3];
@@ -1057,24 +1059,19 @@ local function Tint(i, color, dim)
 	SetItemButtonNormalTextureVertexColor(itemButton, r, g, b);
 end
 
+-- The page hint is about the search only: without a search text it stays empty,
+-- even when category or range filters are active.
 local function UpdateMerchantPageHint()
 	if not merchantPageHint then return; end
-	if not MerchantFilterActive() then
+	local query = SearchText(merchantSearch);
+	if query == "" then
 		merchantPageHint:SetText("");
 		return;
 	end
-	local numItems = GetMerchantNumItems();
 	local pages, seen = {}, {};
-	local query = SearchText(merchantSearch);
-	for index = 1, numItems do
-		local hit;
-		if query ~= "" then
-			local info = C_MerchantFrame.GetItemInfo(index);
-			hit = info and FuzzyMatch(info.name, query);
-		else
-			hit = IsMerchantVisible(index, (ClassifyMerchant(index)));
-		end
-		if hit then
+	for index = 1, GetMerchantNumItems() do
+		local info = C_MerchantFrame.GetItemInfo(index);
+		if info and FuzzyMatch(info.name, query) then
 			local page = math.ceil(index / MERCHANT_ITEMS_PER_PAGE);
 			if not seen[page] then
 				seen[page] = true;

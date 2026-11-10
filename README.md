@@ -2,7 +2,7 @@
 
 **CurseForge:** https://www.curseforge.com/wow/addons/stickyfilters
 
-A quality-of-life addon for **World of Warcraft: Forever** (interface 16001). Trainers and merchants remember what you want to see, and every entry tells you at a glance why you can or cannot use it.
+A quality-of-life addon for **World of Warcraft: Forever** (interface 16001). Trainers and merchants remember what you want to see, and every entry tells you at a glance why you can or cannot use it. Fully available in **English and German**.
 
 ## Features
 
