@@ -97,6 +97,10 @@ local L = {
 	WINDOW_SIZE_LEVEL = "    N = levels above yours",
 	WINDOW_SIZE_SKILL = "    N = points above your profession skill",
 	OPT_MERCHANT = "Merchant",
+	OPT_QUEST = "Quest rewards",
+	OPT_QUEST_COLORS = "Color quest rewards",
+	OPT_QUEST_CHECK = "Check mark on quest rewards",
+	OPT_QUEST_TOOLTIP = "Explanations in the tooltip",
 	OPT_ICON_COIN = "Crossed-out currency icon (cannot afford)",
 	OPT_ICON_CHECK = "Green check mark (fits me)",
 	OPT_RESET_HEADER = "Reset",
@@ -188,6 +192,10 @@ local function ApplyGerman()
 	L.WINDOW_SIZE_LEVEL = "    N = Stufen \195\188ber deiner";
 	L.WINDOW_SIZE_SKILL = "    N = Punkte \195\188ber deiner Berufsfertigkeit";
 	L.OPT_MERCHANT = "H\195\164ndler";
+	L.OPT_QUEST = "Questbelohnungen";
+	L.OPT_QUEST_COLORS = "Questbelohnungen einf\195\164rben";
+	L.OPT_QUEST_CHECK = "H\195\164kchen an Questbelohnungen";
+	L.OPT_QUEST_TOOLTIP = "Erkl\195\164rungen im Tooltip";
 	L.OPT_ICON_COIN = "Durchgestrichenes W\195\164hrungssymbol (zu wenig Geld)";
 	L.OPT_ICON_CHECK = "Gr\195\188nes H\195\164kchen (passt zu mir)";
 	L.OPT_RESET_HEADER = "Zur\195\188cksetzen";
@@ -324,15 +332,14 @@ local function GetTip(index)
 	return tipCache[index] or nil;
 end
 
-local function IsMerchantItemKnown(index)
+-- The item checks below work on tooltip data plus item ID, so merchant items
+-- and quest rewards share them; the merchant wrappers pass GetTip(index).
+local function IsItemKnown(data, itemID)
 	-- Warlock pet tomes only show "Already known" while the matching demon is
 	-- summoned. WhatsTraining remembers learned tomes per character; reuse that.
-	local itemID = GetMerchantItemID(index);
 	if itemID and type(WT_LearnedPetAbilities) == "table" and WT_LearnedPetAbilities[itemID] == true then
 		return true, "WhatsTraining";
 	end
-	if not (C_TooltipInfo and C_TooltipInfo.GetMerchantItem) then return false; end
-	local data = GetTip(index);
 	if not data or not data.lines then return false; end
 	for _, line in ipairs(data.lines) do
 		if LINE_USAGE_REQUIREMENT and line.type == LINE_USAGE_REQUIREMENT
@@ -345,6 +352,10 @@ local function IsMerchantItemKnown(index)
 		end
 	end
 	return false;
+end
+
+local function IsMerchantItemKnown(index)
+	return IsItemKnown(GetTip(index), GetMerchantItemID(index));
 end
 
 local REQ_RACE_CLASS = Enum.TooltipDataUsageRequirementType and Enum.TooltipDataUsageRequirementType.RaceClass;
@@ -370,9 +381,8 @@ end
 -- requirement lines: a class/race restriction, and a skill requirement naming
 -- a profession the character does not have. A too low level or profession
 -- rank stays Blizzard red, because it becomes usable later.
-local function IsNeverUsable(index)
-	if not (C_TooltipInfo and C_TooltipInfo.GetMerchantItem and LINE_USAGE_REQUIREMENT) then return false; end
-	local data = GetTip(index);
+local function IsNeverUsableData(data)
+	if not LINE_USAGE_REQUIREMENT then return false; end
 	if not data or not data.lines then return false; end
 	for _, line in ipairs(data.lines) do
 		if line.type == LINE_USAGE_REQUIREMENT and IsRedLine(line) then
@@ -394,6 +404,10 @@ local function IsNeverUsable(index)
 		end
 	end
 	return false;
+end
+
+local function IsNeverUsable(index)
+	return IsNeverUsableData(GetTip(index));
 end
 
 local LINE_EQUIP_SLOT = Enum.TooltipDataLineType and Enum.TooltipDataLineType.EquipSlot;
@@ -438,14 +452,12 @@ end
 -- Weapon/armor whose type Blizzard prints in red ("One-Hand | Sword" or
 -- "Chest | Mail"): the character lacks that proficiency. Returns
 -- "learnable", "never" or nil.
-local function GetProficiencyState(index)
+local function GetProficiencyStateData(data, itemID)
 	if not (LINE_EQUIP_SLOT and C_Item and C_Item.GetItemInfoInstant) then return nil; end
-	local itemID = GetMerchantItemID(index);
 	if not itemID then return nil; end
 	local _, _, _, _, _, classID, subClassID = C_Item.GetItemInfoInstant(itemID);
 	local kind = (classID == ITEM_CLASS_WEAPON and "weapon") or (classID == ITEM_CLASS_ARMOR and "armor") or nil;
 	if not kind then return nil; end
-	local data = GetTip(index);
 	if not data or not data.lines then return nil; end
 	for _, line in ipairs(data.lines) do
 		if line.type == LINE_EQUIP_SLOT then
@@ -458,6 +470,10 @@ local function GetProficiencyState(index)
 		end
 	end
 	return nil;
+end
+
+local function GetProficiencyState(index)
+	return GetProficiencyStateData(GetTip(index), GetMerchantItemID(index));
 end
 
 -- Small gold coin in the top-left corner of the item icon (created on demand).
@@ -644,6 +660,9 @@ end
 -- Assigned further down (needs the classification helpers): returns a list of
 -- short explanations why the hovered entry has its color / is dimmed.
 local GetReasonLines;
+-- Assigned in the quest reward section: adds the explanation lines to a
+-- tooltip that shows a quest reward item.
+local AddQuestRewardLines;
 local smallLines = {};
 
 local reasonFont;
@@ -659,6 +678,8 @@ end
 
 local function AddSmallGrayLine(tooltip, text)
 	tooltip:AddLine(text, 0.6, 0.6, 0.6, true);
+	-- Smaller font only on GameTooltip (its font is reset on clear below).
+	if tooltip ~= GameTooltip then return; end
 	local fs = _G[tooltip:GetName() .. "TextLeft" .. tooltip:NumLines()];
 	if fs then
 		fs:SetFontObject(GetReasonFont());
@@ -674,7 +695,16 @@ GameTooltip:HookScript("OnTooltipCleared", function()
 	end
 end);
 
-local function AddMoneyLines(tooltip)
+-- Tooltips filled by these C_TooltipInfo getters show a quest reward item, no
+-- matter which addon owns the tooltip (Blizzard, Immersion, ...).
+local QUEST_REWARD_GETTERS = { GetQuestItem = true, GetQuestLogItem = true };
+
+local function AddMoneyLines(tooltip, tooltipData)
+	local info = tooltip.GetProcessingTooltipInfo and tooltip:GetProcessingTooltipInfo();
+	if info and QUEST_REWARD_GETTERS[info.getterName] then
+		if AddQuestRewardLines then AddQuestRewardLines(tooltip, tooltipData); end
+		return;
+	end
 	if tooltip ~= GameTooltip then return; end
 	local owner = tooltip:GetOwner();
 	local reasons = GetReasonLines and GetReasonLines(owner) or {};
@@ -891,8 +921,7 @@ local function IsTooExpensive(index)
 end
 
 local REQ_LEVEL_TYPE = Enum.TooltipDataUsageRequirementType and Enum.TooltipDataUsageRequirementType.Level;
-local function MerchantLevelTooLow(index)
-	local data = GetTip(index);
+local function LevelTooLowData(data)
 	if not (data and data.lines and REQ_LEVEL_TYPE) then return false; end
 	for _, line in ipairs(data.lines) do
 		if line.type == LINE_USAGE_REQUIREMENT and line.requirementType == REQ_LEVEL_TYPE and IsRedLine(line) then
@@ -900,6 +929,10 @@ local function MerchantLevelTooLow(index)
 		end
 	end
 	return false;
+end
+
+local function MerchantLevelTooLow(index)
+	return LevelTooLowData(GetTip(index));
 end
 
 -- Returns category, soldOut.
@@ -963,9 +996,8 @@ end
 local CLASSES_PREFIX = Prefix(ITEM_CLASSES_ALLOWED);
 local RACES_PREFIX = Prefix(ITEM_RACES_ALLOWED);
 
-local function FitsMe(index)
+local function FitsMeData(data, itemID)
 	local enabled = function(key) return not (db and db.fitsMe and db.fitsMe[key] == false); end;
-	local data = GetTip(index);
 	if data and data.lines then
 		for _, line in ipairs(data.lines) do
 			if line.type == LINE_USAGE_REQUIREMENT and not IsRedLine(line) and type(line.leftText) == "string" then
@@ -984,7 +1016,6 @@ local function FitsMe(index)
 	end
 	-- Gear: weapon/armor type the class can use and already knows (type line not red).
 	if enabled("gear") and C_Item and C_Item.GetItemInfoInstant and data and data.lines then
-		local itemID = GetMerchantItemID(index);
 		local _, _, _, _, _, classID, subClassID = C_Item.GetItemInfoInstant(itemID or 0);
 		local kind = (classID == ITEM_CLASS_WEAPON and "weapon") or (classID == ITEM_CLASS_ARMOR and "armor") or nil;
 		local rules = CAN_EVER_USE[select(2, UnitClass("player"))];
@@ -998,6 +1029,10 @@ local function FitsMe(index)
 		end
 	end
 	return nil;
+end
+
+local function FitsMe(index)
+	return FitsMeData(GetTip(index), GetMerchantItemID(index));
 end
 
 -- Green 7x7 check: directly below the coin if one is shown, else at the coin spot.
@@ -1126,6 +1161,126 @@ local function TintMerchantItems()
 	end
 	UpdateMerchantPageHint();
 end
+
+---------------------------------------------------------------------------
+-- Quest rewards: quest log preview and quest giver (accept / turn in).
+-- Buttons: every UI that updates its reward buttons through Blizzard's item
+-- button helpers (Blizzard, Immersion and most reskins) is covered, because
+-- such buttons carry type ("choice"/"reward") and the reward index as ID.
+-- Tooltips: recognized by their C_TooltipInfo getter, see AddMoneyLines.
+---------------------------------------------------------------------------
+
+local QUEST_REWARD_TYPES = { choice = true, reward = true };
+local QUEST_COLORS = { known = KNOWN, profession = PROFESSION_MISSING, never = NEVER_USABLE, skill = LEARNABLE };
+
+local function QuestOption(key)
+	return not (db and db.quest and db.quest[key] == false);
+end
+
+local function IsQuestRewardButton(button)
+	return type(button) == "table" and QUEST_REWARD_TYPES[button.type] and button.GetID ~= nil
+		and (button:GetID() or 0) > 0 or false;
+end
+
+-- Blizzard's own reward frames while they show a quest log entry (map side
+-- panel, quest popup). Everything else uses the quest giver API.
+local function IsQuestLogButton(button)
+	if not (QuestInfoFrame and QuestInfoFrame.questLog) then return false; end
+	local parent = button:GetParent();
+	return parent ~= nil and (parent == QuestInfoRewardsFrame or parent == MapQuestInfoRewardsFrame);
+end
+
+local function GetQuestRewardData(button)
+	if not C_TooltipInfo then return nil; end
+	local data;
+	if IsQuestLogButton(button) then
+		data = C_TooltipInfo.GetQuestLogItem and C_TooltipInfo.GetQuestLogItem(button.type, button:GetID(), button.questID);
+	else
+		data = C_TooltipInfo.GetQuestItem and C_TooltipInfo.GetQuestItem(button.type, button:GetID());
+	end
+	return data;
+end
+
+-- Same categories as merchant items, without "expensive".
+local function ClassifyQuestReward(data, itemID)
+	if IsItemKnown(data, itemID) then return "known"; end
+	local never, why = IsNeverUsableData(data);
+	if never and why == "profession" then return "profession"; end
+	local proficiency = GetProficiencyStateData(data, itemID);
+	if proficiency == "never" or never then return "never"; end
+	if proficiency == "learnable" then return "skill"; end
+	if LevelTooLowData(data) then return "level"; end
+	if data and data.lines and LINE_USAGE_REQUIREMENT then
+		for _, line in ipairs(data.lines) do
+			if line.type == LINE_USAGE_REQUIREMENT and IsRedLine(line) then return "other"; end
+		end
+	end
+	return "normal";
+end
+
+-- Item ID of tooltip data (id, or the hyperlink as fallback).
+local function TipItemID(data)
+	if not data then return nil; end
+	if data.id then return data.id; end
+	if data.hyperlink and C_Item and C_Item.GetItemInfoInstant then
+		return (C_Item.GetItemInfoInstant(data.hyperlink));
+	end
+	return nil;
+end
+
+local function QuestIcon(button)
+	local name = button.GetName and button:GetName();
+	return button.Icon or button.icon or (name and _G[name .. "IconTexture"]) or nil;
+end
+
+local questTinting = false;
+local function DecorateQuestReward(button)
+	local isItem = button.objectType == nil or button.objectType == "item";
+	local data = isItem and GetQuestRewardData(button) or nil;
+	local itemID = TipItemID(data);
+	local icon = QuestIcon(button);
+	local cat = data and ClassifyQuestReward(data, itemID) or "normal";
+	local color = QuestOption("colors") and QUEST_COLORS[cat] or nil;
+	if color then
+		questTinting = true;
+		SetItemButtonTextureVertexColor(button, color[1], color[2], color[3]);
+		SetItemButtonNameFrameVertexColor(button, color[1], color[2], color[3]);
+		questTinting = false;
+	end
+	if icon and icon.SetDesaturated then icon:SetDesaturated(color == KNOWN); end
+	SetCheckOn(button, icon, QuestOption("check") and data ~= nil and FitsMeData(data, itemID) ~= nil, false);
+	-- Item not cached yet: its tooltip lacks the requirement lines. Decorate
+	-- again once it is loaded, if the button still shows the same reward.
+	if isItem and itemID and C_Item and C_Item.IsItemDataCachedByID and not C_Item.IsItemDataCachedByID(itemID)
+		and Item and Item.CreateFromItemID then
+		local rewardType, rewardID = button.type, button:GetID();
+		Item:CreateFromItemID(itemID):ContinueOnItemLoad(function()
+			if button.type == rewardType and button:GetID() == rewardID then DecorateQuestReward(button); end
+		end);
+	end
+end
+
+-- Blizzard and other UIs color reward buttons through this helper whenever
+-- they (re)draw them, including after item data finished loading.
+hooksecurefunc("SetItemButtonTextureVertexColor", function(button)
+	if questTinting or not IsQuestRewardButton(button) then return; end
+	DecorateQuestReward(button);
+end);
+
+AddQuestRewardLines = function(tooltip, data)
+	if not (QuestOption("tooltip") and data and data.lines) then return; end
+	local itemID = TipItemID(data);
+	local lines = {};
+	local cat = ClassifyQuestReward(data, itemID);
+	if L["WHY_" .. cat:upper()] then lines[#lines + 1] = L["WHY_" .. cat:upper()]; end
+	local fits = FitsMeData(data, itemID);
+	if fits then lines[#lines + 1] = L["WHY_FITS_" .. fits:upper()]; end
+	if #lines == 0 then return; end
+	tooltip:AddLine(" ");
+	for _, text in ipairs(lines) do
+		AddSmallGrayLine(tooltip, text);
+	end
+end;
 
 -- Explanations shown in gray under Missing/After buy.
 GetReasonLines = function(owner)
@@ -1552,6 +1707,12 @@ end
 -- Tooltips for the options page: { English, German }. Each explains the
 -- setting and gives an example.
 local TIPS = {
+	quest_colors = { "Same colors as at merchants, in the quest log and when you accept or turn in a quest.\nExample: plate armor for a mage is dark red.",
+		"Gleiche Farben wie beim H\195\164ndler, im Questlog und beim Annehmen oder Abgeben einer Quest.\nBeispiel: Plattenr\195\188stung f\195\188r einen Magier ist dunkelrot." },
+	quest_check = { "Green check on rewards that fit you, with the criteria from the Merchant page.\nExample: a leather chest for a rogue.",
+		"Gr\195\188nes H\195\164kchen an Belohnungen, die zu dir passen, mit den Kriterien von der H\195\164ndler-Seite.\nBeispiel: eine Lederbrust f\195\188r einen Schurken." },
+	quest_tooltip = { "Short gray explanation in the reward tooltip, also in addons that replace the quest window.\nExample: 'Dark red: your character can never use this'.",
+		"Kurze graue Erkl\195\164rung im Tooltip der Belohnung, auch in Addons, die das Questfenster ersetzen.\nBeispiel: 'Dunkelrot: f\195\188r deinen Charakter nie benutzbar'." },
 	blizz_available = { "Blizzard's own trainer filter, remembered by StickyFilters.\nExample: off = services you can learn right now are hidden.",
 		"Blizzards eigener Lehrer-Filter, von StickyFilters gemerkt.\nBeispiel: aus = Eintr\195\164ge, die du sofort lernen kannst, werden ausgeblendet." },
 	blizz_unavailable = { "Blizzard's own trainer filter, remembered by StickyFilters.\nExample: off = spells that need a higher level are hidden.",
@@ -1756,13 +1917,20 @@ local function CreateOptionsPanel()
 	Header(tLayout, L.OPT_SEC_CATEGORIES);
 	for _, cat in ipairs(TRAINER_CATS) do
 		local get, set = ShowCategory("trainerShow", cat);
-		Checkbox(tCat, L["CAT_" .. cat:upper()], not (cat == "known" or cat == "skill"), get, set, Tip("cat_" .. cat));
+		Checkbox(tCat, L["CAT_" .. cat:upper()], cat ~= "known", get, set, Tip("cat_" .. cat));
 	end
 	Header(tLayout, L.OPT_SEC_RANGES);
 	Window(tCat, "level", "trainer", 1, 60);
 	Window(tCat, "skill", "trainer", 1, 300);
 	Header(tLayout, L.OPT_SEC_SEARCH);
 	SearchSettings(tCat, "trainer");
+
+	-- Quest rewards page
+	local qCat = Settings.RegisterVerticalLayoutSubcategory(category, L.OPT_QUEST);
+	for _, key in ipairs({ "colors", "check", "tooltip" }) do
+		Checkbox(qCat, L["OPT_QUEST_" .. key:upper()], true, function() return QuestOption(key); end,
+			function(v) db.quest = db.quest or {}; db.quest[key] = v; RefreshAll(); end, Tip("quest_" .. key));
+	end
 
 	Settings.RegisterAddOnCategory(category);
 end
@@ -1798,7 +1966,8 @@ local function ApplyFirstRunDefaults(t)
 	t.initialized = true;
 	t.categorize = false;
 	t.trainer = { available = true, unavailable = true, used = false };
-	t.trainerShow = { known = false, skill = false };
+	t.defaultsVersion = 2;
+	t.trainerShow = { known = false };
 	t.merchantShow = { known = false, never = false };
 	t.trainerLevelWindow = true;
 	t.trainerSkillWindow = true;
@@ -1862,6 +2031,12 @@ frame:SetScript("OnEvent", function(self, event, arg1)
 			local fresh = StickyFiltersDB == nil;
 			StickyFiltersDB = StickyFiltersDB or {};
 			if fresh then ApplyFirstRunDefaults(StickyFiltersDB); end
+			-- Defaults v2: "Skill missing" is shown at trainers, otherwise the
+			-- profession range filter would only reveal dimmed entries.
+			if (StickyFiltersDB.defaultsVersion or 1) < 2 then
+				StickyFiltersDB.defaultsVersion = 2;
+				if StickyFiltersDB.trainerShow then StickyFiltersDB.trainerShow.skill = nil; end
+			end
 			local lang = StickyFiltersDB.language or (GetLocale() == "deDE" and "de" or "en");
 			if lang == "de" then ApplyGerman(); end
 			currentLang = lang;

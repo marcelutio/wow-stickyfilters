@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.0
+
+- Quest rewards in the quest log preview and at the quest giver (accept and turn in) use the merchant colors and the green check mark
+- Short explanations in the reward tooltip, also in addons that replace the quest window (for example Immersion)
+- New options page "Quest rewards"
+- Trainer: "Skill missing" is shown by default, so the profession range filter is not hidden by it (applied once to existing settings)
+
 ## 1.0.1
 
 - Hint text uses neutral wording and names the full options path

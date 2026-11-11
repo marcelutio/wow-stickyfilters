@@ -45,6 +45,12 @@ The **crossed-out coin** appears on everything you cannot afford, in every color
 - **Remembered Blizzard filters:** "Available", "Unavailable", "Already known" and "Categorize" are saved account-wide and re-applied at every trainer. Changes made by other addons (for example ones that switch all filters on to scan the list) are reverted automatically.
 - **Own search box and filter menu** with the same categories and range filters as merchants. Blizzard's own trainer menu stays untouched.
 
+### Quest rewards
+
+- In the quest log preview and at the quest giver (accept and turn in), rewards get the same colors and green check mark as merchant items.
+- Works with Blizzard's quest window and with addons that replace it (for example Immersion): the buttons are recognized by Blizzard's own item button helpers, the tooltip lines by the reward tooltip itself.
+- The reward tooltip explains the color and the check mark.
+
 ### Search memory and hint
 
 - **Remember search** (on by default): the search text survives closing the window, as a separate search per NPC (default) or one search for all.
@@ -62,12 +68,13 @@ Everything can be configured without commands under **Options > AddOns > StickyF
 - **General:** language, icons, "Reload UI" button, reset
 - **Merchant:** color categories, range filters (with sliders), check mark criteria, search memory, hint
 - **Trainer:** remembered Blizzard filters, color categories, range filters, search memory, hint
+- **Quest rewards:** colors, check mark, tooltip explanations
 
 Every setting has a tooltip with an example. The filter menus on the merchant and trainer windows offer the same switches directly.
 
 ### Defaults (first run)
 
-- Trainer: Categorize off, Available on, Unavailable on; StickyFilters categories "Already known" and "Skill missing" dimmed, everything else shown
+- Trainer: Categorize off, Available on, Unavailable on; StickyFilters category "Already known" dimmed, everything else shown
 - Merchant: "Already known" and "Never usable" dimmed, everything else shown
 - Both: range filters on (+3 levels, +15 profession points), search remembered per NPC, hint shown, icons on
 
