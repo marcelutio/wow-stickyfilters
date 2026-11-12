@@ -2,7 +2,7 @@
 
 **CurseForge:** https://www.curseforge.com/wow/addons/stickyfilters
 
-A quality-of-life addon for **World of Warcraft: Forever** (interface 16001). Trainers and merchants remember what you want to see, and every entry tells you at a glance why you can or cannot use it. Fully available in **English and German**.
+A quality-of-life addon for **World of Warcraft: Forever** (interface 16001). Trainers and merchants remember what you want to see, and every entry tells you at a glance why you can or cannot use it. Fully available in **English and German**. Works with **EllesmereUI** and **MerchantPlus**.
 
 <p>
   <a href="https://media.forgecdn.net/attachments/2179/6/0-png.png"><img src="https://media.forgecdn.net/attachments/2179/6/0-png.png" alt="StickyFilters0" width="32%"></a><a href="https://media.forgecdn.net/attachments/2179/7/1-png.png"><img src="https://media.forgecdn.net/attachments/2179/7/1-png.png" alt="StickyFilters1" width="32%"></a><a href="https://media.forgecdn.net/attachments/2179/8/2-png.png"><img src="https://media.forgecdn.net/attachments/2179/8/2-png.png" alt="StickyFilters2" width="32%"></a>
@@ -38,6 +38,7 @@ The **crossed-out coin** appears on everything you cannot afford, in every color
 - **Category filters:** unchecked categories are dimmed, never hidden, so a click always buys the item you clicked.
 - **Range filters:** "Only up to +3 levels" and "Only up to +15 profession points"; the numbers are adjustable.
 - **Page hint** shows on which pages the search matches are.
+- **Buyback tab:** the same colors, filters, search and icons as the merchant tab.
 - **Green check mark** on items that fit you: made for your class or race, armor and weapon types you can use, recipes for your professions.
 
 ### Trainers
@@ -66,7 +67,7 @@ The **crossed-out coin** appears on everything you cannot afford, in every color
 Everything can be configured without commands under **Options > AddOns > StickyFilters** (or `/stickyfilters options`):
 
 - **General:** language, icons, "Reload UI" button, reset
-- **Merchant:** color categories, range filters (with sliders), check mark criteria, search memory, hint
+- **Merchant:** color categories, range filters (with sliders), check mark criteria, search memory, hint, MerchantPlus row color (only shown when MerchantPlus is installed)
 - **Trainer:** remembered Blizzard filters, color categories, range filters, search memory, hint
 - **Quest rewards:** colors, check mark, tooltip explanations
 
@@ -98,6 +99,8 @@ English and German. By default the client language is used; it can be forced to 
 
 - Works next to addons that temporarily change trainer filters (for example Warchive): your choice is restored afterwards.
 - Warlock tomes: if WhatsTraining is installed, the tomes it remembers as learned are shown as known.
+- EllesmereUI: works with its merchant skin in all three views (tiles, "Show As List", expanded vendor UI) and on the buyback tab; search boxes, filter buttons and hints follow the EllesmereUI look (EllesmereUI option for third-party addon skins). "Show As List" itself needs EllesmereUI's Merchant window skin turned on.
+- MerchantPlus: its list tab gets the same colors, icons, dimming, search highlight and tooltip lines; the whole row can be tinted in the item's color (option on the Merchant settings page).
 
 ## License
 

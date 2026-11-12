@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.0
+
+- EllesmereUI merchant skin: colors, dimming, icons, search highlight and tooltips also work in its "Show As List" and expanded vendor views; the page hint follows the expanded view's page size
+- EllesmereUI: search boxes, filter buttons and hint boxes use the EllesmereUI look through its skinning API (can be turned off in EllesmereUI under third-party addon skins)
+- MerchantPlus: its list tab gets the same colors, dimming, icons and tooltip lines; the whole row is tinted in the item's color (option); icons are 25% smaller there
+- Buyback tab: colors, dimming, filters, search, icons and tooltip lines work there too
+- Coin and check mark icons sit half outside the item icon on merchant tiles
+- Dimmed purple (epic) item names are easier to read
+- Tooltip wording names the green check mark and the green search animation explicitly
+- Colors and icons refresh when money, bags or learned recipes change while the merchant is open
+
 ## 1.1.0
 
 - Quest rewards in the quest log preview and at the quest giver (accept and turn in) use the merchant colors and the green check mark

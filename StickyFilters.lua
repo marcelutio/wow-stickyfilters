@@ -61,7 +61,7 @@ local L = {
 	DIM_SKILL = "Dimmed: more than %d profession points above your skill",
 	SKILL_WINDOW = "Only up to +%d profession points",
 	DIM_SEARCH = "Dimmed: does not match the search",
-	SEARCH_MATCH = "Green: matches the search",
+	SEARCH_MATCH = "Green animation: matches the search",
 	SAVE_SEARCH = "Remember search",
 	ERROR = "error",
 	MSG_OPEN_MERCHANT = "open a merchant first.",
@@ -98,6 +98,7 @@ local L = {
 	WINDOW_SIZE_SKILL = "    N = points above your profession skill",
 	OPT_MERCHANT = "Merchant",
 	OPT_QUEST = "Quest rewards",
+	OPT_PLUS_ROW = "MerchantPlus: color the whole row",
 	OPT_QUEST_COLORS = "Color quest rewards",
 	OPT_QUEST_CHECK = "Check mark on quest rewards",
 	OPT_QUEST_TOOLTIP = "Explanations in the tooltip",
@@ -117,10 +118,10 @@ local L = {
 	FITS_RACE = "My race",
 	FITS_GEAR = "Fitting gear",
 	FITS_RECIPE = "Recipes for my professions",
-	WHY_FITS_CLASS = "Check mark: made for your class",
-	WHY_FITS_RACE = "Check mark: made for your race",
-	WHY_FITS_GEAR = "Check mark: armor or weapon type you can use",
-	WHY_FITS_RECIPE = "Check mark: recipe for one of your professions",
+	WHY_FITS_CLASS = "Green check mark: made for your class",
+	WHY_FITS_RACE = "Green check mark: made for your race",
+	WHY_FITS_GEAR = "Green check mark: armor or weapon type you can use",
+	WHY_FITS_RECIPE = "Green check mark: recipe for one of your professions",
 };
 -- German strings; applied on ADDON_LOADED depending on the language setting
 -- (Automatic = client language, or forced English / German).
@@ -156,7 +157,7 @@ local function ApplyGerman()
 	L.DIM_SKILL = "Abgedunkelt: mehr als %d Berufspunkte \195\188ber deiner Fertigkeit";
 	L.SKILL_WINDOW = "Nur bis +%d Berufspunkte";
 	L.DIM_SEARCH = "Abgedunkelt: passt nicht zur Suche";
-	L.SEARCH_MATCH = "Gr\195\188n: passt zur Suche";
+	L.SEARCH_MATCH = "Gr\195\188ne Animation: passt zur Suche";
 	L.SAVE_SEARCH = "Sucheingabe speichern";
 	L.ERROR = "Fehler";
 	L.MSG_OPEN_MERCHANT = "\195\150ffne zuerst einen H\195\164ndler.";
@@ -193,6 +194,7 @@ local function ApplyGerman()
 	L.WINDOW_SIZE_SKILL = "    N = Punkte \195\188ber deiner Berufsfertigkeit";
 	L.OPT_MERCHANT = "H\195\164ndler";
 	L.OPT_QUEST = "Questbelohnungen";
+	L.OPT_PLUS_ROW = "MerchantPlus: ganze Zeile einf\195\164rben";
 	L.OPT_QUEST_COLORS = "Questbelohnungen einf\195\164rben";
 	L.OPT_QUEST_CHECK = "H\195\164kchen an Questbelohnungen";
 	L.OPT_QUEST_TOOLTIP = "Erkl\195\164rungen im Tooltip";
@@ -212,10 +214,10 @@ local function ApplyGerman()
 	L.FITS_RACE = "Mein Volk";
 	L.FITS_GEAR = "Passende Ausr\195\188stung";
 	L.FITS_RECIPE = "Rezepte meiner Berufe";
-	L.WHY_FITS_CLASS = "H\195\164kchen: f\195\188r deine Klasse";
-	L.WHY_FITS_RACE = "H\195\164kchen: f\195\188r dein Volk";
-	L.WHY_FITS_GEAR = "H\195\164kchen: R\195\188stungs- oder Waffentyp, den du benutzen kannst";
-	L.WHY_FITS_RECIPE = "H\195\164kchen: Rezept f\195\188r einen deiner Berufe";
+	L.WHY_FITS_CLASS = "Gr\195\188nes H\195\164kchen: f\195\188r deine Klasse";
+	L.WHY_FITS_RACE = "Gr\195\188nes H\195\164kchen: f\195\188r dein Volk";
+	L.WHY_FITS_GEAR = "Gr\195\188nes H\195\164kchen: R\195\188stungs- oder Waffentyp, den du benutzen kannst";
+	L.WHY_FITS_RECIPE = "Gr\195\188nes H\195\164kchen: Rezept f\195\188r einen deiner Berufe";
 end
 
 local function Debug(...)
@@ -499,7 +501,6 @@ local function SetCoinOn(itemButton, anchor, show, texture)
 		-- Holder frame above the icon; coin plus a thin red cross ("not enough money").
 		local holder = CreateFrame("Frame", nil, itemButton);
 		holder:SetSize(10, 10);
-		holder:SetPoint("TOPLEFT", anchor or itemButton, "TOPLEFT", -1, 1);
 		holder:SetFrameLevel(itemButton:GetFrameLevel() + 10); -- above the search effect (+6)
 		holder:SetIgnoreParentAlpha(false);
 		local coin = holder:CreateTexture(nil, "ARTWORK");
@@ -520,8 +521,11 @@ local function SetCoinOn(itemButton, anchor, show, texture)
 	local holder = itemButton.StickyFiltersCoin;
 	if holder then
 		if show then
-			local size = PX(holder, 10);
+			local size = PX(holder, 10 * (itemButton.StickyFiltersIconScale or 1));
 			holder:SetSize(size, size);
+			-- Left half outside the item icon, right half on it (MerchantPlus: fully outside).
+			holder:ClearAllPoints();
+			holder:SetPoint("TOPLEFT", anchor or itemButton, "TOPLEFT", -size * (itemButton.StickyFiltersIconOutside or 0.5), PX(holder, 1));
 			for _, bar in ipairs(holder.lines) do
 				bar:SetSize(size * 1.41, PX(holder, 1));
 			end
@@ -537,14 +541,19 @@ end
 
 -- Thin green frame around a search match; ignores the parent's alpha so a
 -- match stays visible even when its row is dimmed by a category filter.
+-- Size the autocast effect is drawn at before it is scaled to the icon.
+local MATCH_GLOW_SIZE = 36;
 local function SetMatchBorder(button, anchor, show)
 	if not button then return; end
 	if show and not button.StickyFiltersMatch then
 		-- Preferred: Blizzard's pet autocast effect (rotating ants + corners), tinted green.
 		local ok, glow = pcall(CreateFrame, "Frame", nil, button, "AutoCastOverlayTemplate");
 		if ok and glow and glow.Corners then
+			-- Built at action button size and scaled to the icon: on small icons
+			-- (MerchantPlus rows) the animated part would not fit otherwise.
 			glow:ClearAllPoints();
-			glow:SetAllPoints(anchor or button);
+			glow:SetSize(MATCH_GLOW_SIZE, MATCH_GLOW_SIZE);
+			glow.isScaledGlow = true;
 			glow:SetFrameLevel(button:GetFrameLevel() + 6);
 			glow:SetIgnoreParentAlpha(true);
 			for _, tex in ipairs({ glow.Corners, glow.Shine }) do
@@ -576,8 +585,16 @@ local function SetMatchBorder(button, anchor, show)
 		end
 		button.StickyFiltersMatch = holder;
 	end
-	if button.StickyFiltersMatch then
-		button.StickyFiltersMatch:SetShown(show);
+	local match = button.StickyFiltersMatch;
+	if match then
+		if show and match.isScaledGlow then
+			local target = anchor or button;
+			local width = target:GetWidth() or 0;
+			if width > 0 then match:SetScale(width / MATCH_GLOW_SIZE); end
+			match:ClearAllPoints();
+			match:SetPoint("CENTER", target, "CENTER");
+		end
+		match:SetShown(show);
 	end
 end
 
@@ -639,10 +656,31 @@ end
 
 local function GetMerchantIndexFromOwner(owner)
 	if not (owner and MerchantFrame and MerchantFrame:IsShown() and MerchantFrame.selectedTab == 1) then return nil; end
+	-- MerchantPlus rows carry the merchant index in their element data.
+	local plusBox = _G.MerchantPlusItemList and MerchantPlusItemList.ScrollBox;
+	local ownerParent = owner.GetParent and owner:GetParent();
+	if owner.GetElementData and plusBox and ownerParent and (ownerParent == plusBox or ownerParent == plusBox.ScrollTarget)
+		and _G.MerchantPlusFrame and MerchantPlusFrame:IsVisible() then
+		local ok, data = pcall(owner.GetElementData, owner);
+		if ok and type(data) == "table" and tonumber(data.index) then return tonumber(data.index); end
+	end
 	local parent = owner.GetParent and owner:GetParent();
 	local parentName = parent and parent.GetName and parent:GetName();
-	if parentName and parentName:match("^MerchantItem%d+$") and owner.GetID then
+	if parentName and (parentName:match("^MerchantItem%d+$") or parentName:match("^EUI_MerchantItem%d+$")
+		or parentName:match("^EUI_MerchantPage%d+$")) and owner.GetID then
 		return owner:GetID();
+	end
+	return nil;
+end
+
+-- Buyback tab: Blizzard's tiles and EllesmereUI's list rows carry the buyback index.
+local function GetBuybackIndexFromOwner(owner)
+	if not (owner and MerchantFrame and MerchantFrame:IsShown() and MerchantFrame.selectedTab == 2 and owner.GetID) then return nil; end
+	local parent = owner.GetParent and owner:GetParent();
+	local parentName = parent and parent.GetName and parent:GetName();
+	if parentName and (parentName:match("^MerchantItem%d+$") or parentName:match("^EUI_MerchantItem%d+$")) then
+		local index = owner:GetID();
+		if index and index > 0 and index <= GetNumBuybackItems() then return index; end
 	end
 	return nil;
 end
@@ -710,8 +748,12 @@ local function AddMoneyLines(tooltip, tooltipData)
 	local reasons = GetReasonLines and GetReasonLines(owner) or {};
 	local costs;
 	local index = GetMerchantIndexFromOwner(owner);
+	local buybackIndex = not index and GetBuybackIndexFromOwner(owner);
 	if index then
 		costs = GetMerchantCosts(index);
+	elseif buybackIndex then
+		local price = select(3, GetBuybackItemInfo(buybackIndex));
+		costs = price and price > 0 and { { gold = true, need = price, have = GetMoney() } } or {};
 	else
 		local price = GetTrainerCostFromOwner(owner);
 		costs = price and { { gold = true, need = price, have = GetMoney() } } or {};
@@ -752,6 +794,8 @@ end
 ---------------------------------------------------------------------------
 
 local DIM_ALPHA = 0.2;
+-- The buyback tab has a light gray background: dimmed entries 10 points more visible.
+local BUYBACK_DIM_ALPHA = DIM_ALPHA + 0.1;
 -- Our coin/check icons on dimmed rows stay clearly visible (40% opacity).
 local DIM_ICON_ALPHA = 0.4;
 -- Trainer prices and requirement lines on dimmed rows: 10 points above the row.
@@ -954,13 +998,11 @@ end
 -- Required character level of a merchant item: item info first, otherwise the
 -- tooltip's level requirement line (item info may not be cached yet).
 local REQ_LEVEL = Enum.TooltipDataUsageRequirementType and Enum.TooltipDataUsageRequirementType.Level;
-local function GetMerchantItemMinLevel(index)
-	local itemID = GetMerchantItemID(index);
+local function MinLevelData(data, itemID)
 	if itemID and C_Item and C_Item.GetItemInfo then
 		local minLevel = select(5, C_Item.GetItemInfo(itemID));
 		if minLevel and minLevel > 0 then return minLevel; end
 	end
-	local data = GetTip(index);
 	if data and data.lines and REQ_LEVEL then
 		for _, line in ipairs(data.lines) do
 			if line.type == LINE_USAGE_REQUIREMENT and line.requirementType == REQ_LEVEL and type(line.leftText) == "string" then
@@ -972,10 +1014,13 @@ local function GetMerchantItemMinLevel(index)
 	return nil;
 end
 
+local function GetMerchantItemMinLevel(index)
+	return MinLevelData(GetTip(index), GetMerchantItemID(index));
+end
+
 -- Required rank of an owned profession ("Requires Cooking (50)"), plus the
 -- character's current rank; nil if the item needs no owned profession.
-local function GetMerchantSkillGap(index)
-	local data = GetTip(index);
+local function SkillGapData(data)
 	if not (data and data.lines and REQ_SKILL) then return nil; end
 	for _, line in ipairs(data.lines) do
 		if line.type == LINE_USAGE_REQUIREMENT and line.requirementType == REQ_SKILL then
@@ -985,6 +1030,10 @@ local function GetMerchantSkillGap(index)
 		end
 	end
 	return nil;
+end
+
+local function GetMerchantSkillGap(index)
+	return SkillGapData(GetTip(index));
 end
 
 -- "Fits me" checks (highlight only, never dims). Returns the first matching
@@ -1053,12 +1102,13 @@ local function SetCheckOn(itemButton, anchor, show, belowCoin)
 	local holder = itemButton.StickyFiltersCheck;
 	if not holder then return; end
 	if show then
-		holder:SetSize(PX(holder, 10), PX(holder, 10));
+		local size = PX(holder, 10 * (itemButton.StickyFiltersIconScale or 1));
+		holder:SetSize(size, size);
 		holder:ClearAllPoints();
 		if belowCoin and itemButton.StickyFiltersCoin then
 			holder:SetPoint("TOPLEFT", itemButton.StickyFiltersCoin, "BOTTOMLEFT", 0, -PX(holder, 1));
 		else
-			holder:SetPoint("TOPLEFT", anchor or itemButton, "TOPLEFT", -1, 1);
+			holder:SetPoint("TOPLEFT", anchor or itemButton, "TOPLEFT", -size * (itemButton.StickyFiltersIconOutside or 0.5), PX(holder, 1));
 		end
 	end
 	holder:SetShown(show);
@@ -1080,34 +1130,78 @@ local function IsMerchantVisible(index, cat)
 	return info and FuzzyMatch(info.name, query) or false;
 end
 
+-- Merchant rows. Blizzard's 10 tiles (also when EllesmereUI skins them),
+-- EllesmereUI's list rows ("Show As List", icon = the row's SlotTexture) and
+-- its expanded tiles. Every row's ItemButton carries the real merchant index
+-- as its ID, so all of them share one code path.
+local MERCHANT_ROW_SETS = {
+	{ prefix = "MerchantItem" },
+	{ prefix = "EUI_MerchantItem", list = true },
+	{ prefix = "EUI_MerchantPage" },
+};
+
 -- dim = Blizzard's darker variant (sold out); name frame is always half as bright.
-local function Tint(i, color, dim)
+local function Tint(row, itemButton, color, dim, list)
 	local r, g, b = color[1], color[2], color[3];
 	if dim then
 		r, g, b = r * 0.5, g * 0.5, b * 0.5;
 	end
-	local merchantButton = _G["MerchantItem" .. i];
-	local itemButton = _G["MerchantItem" .. i .. "ItemButton"];
-	SetItemButtonNameFrameVertexColor(merchantButton, r * 0.6, g * 0.6, b * 0.6);
-	SetItemButtonSlotVertexColor(merchantButton, r, g, b);
+	if list then
+		if row.SlotTexture then row.SlotTexture:SetVertexColor(r, g, b); end
+		return;
+	end
+	SetItemButtonNameFrameVertexColor(row, r * 0.6, g * 0.6, b * 0.6);
+	SetItemButtonSlotVertexColor(row, r, g, b);
 	SetItemButtonTextureVertexColor(itemButton, r, g, b);
 	SetItemButtonNormalTextureVertexColor(itemButton, r, g, b);
 end
 
+local function EllesmereListActive()
+	return _G.WSkinMerchantScrollFrame ~= nil and WSkinMerchantScrollFrame:IsVisible();
+end
+
+local function MerchantPlusActive()
+	return _G.MerchantPlusFrame ~= nil and MerchantPlusFrame:IsVisible();
+end
+
+-- Merchant index of a MerchantPlus row (its element data), nil otherwise.
+local function IsMerchantPlusRow(row)
+	local list = _G.MerchantPlusItemList;
+	local box = list and list.ScrollBox;
+	local parent = row and row.GetParent and row:GetParent();
+	return box ~= nil and parent ~= nil and (parent == box or parent == box.ScrollTarget);
+end
+
+local function MerchantPlusRowIndex(row)
+	if not (row and row.GetElementData and MerchantPlusActive() and IsMerchantPlusRow(row)) then return nil; end
+	local ok, data = pcall(row.GetElementData, row);
+	return ok and type(data) == "table" and tonumber(data.index) or nil;
+end
+
+local function MerchantItemsPerPage()
+	local eui = _G.EllesmereUI;
+	if eui and eui._Merchant_ExpandActive and eui._Merchant_ExpandPerPage and eui._Merchant_ExpandActive() then
+		local n = eui._Merchant_ExpandPerPage();
+		if type(n) == "number" and n > 0 then return n; end
+	end
+	return MERCHANT_ITEMS_PER_PAGE;
+end
+
 -- The page hint is about the search only: without a search text it stays empty,
--- even when category or range filters are active.
+-- even when category or range filters are active. EllesmereUI's list has no pages.
 local function UpdateMerchantPageHint()
 	if not merchantPageHint then return; end
 	local query = SearchText(merchantSearch);
-	if query == "" then
+	if query == "" or EllesmereListActive() or MerchantPlusActive() then
 		merchantPageHint:SetText("");
 		return;
 	end
+	local perPage = MerchantItemsPerPage();
 	local pages, seen = {}, {};
 	for index = 1, GetMerchantNumItems() do
 		local info = C_MerchantFrame.GetItemInfo(index);
 		if info and FuzzyMatch(info.name, query) then
-			local page = math.ceil(index / MERCHANT_ITEMS_PER_PAGE);
+			local page = math.ceil(index / perPage);
 			if not seen[page] then
 				seen[page] = true;
 				pages[#pages + 1] = tostring(page);
@@ -1117,49 +1211,251 @@ local function UpdateMerchantPageHint()
 	merchantPageHint:SetText(#pages > 0 and L.MATCHES_ON_PAGES:format(table.concat(pages, ", ")) or L.NO_MATCHES);
 end
 
-local function TintMerchantItems()
-	if not MerchantFrame or MerchantFrame.selectedTab ~= 1 then return; end
-	local numItems = GetMerchantNumItems();
-	for i = 1, MERCHANT_ITEMS_PER_PAGE do
-		local index = ((MerchantFrame.page - 1) * MERCHANT_ITEMS_PER_PAGE) + i;
-		local merchantButton = _G["MerchantItem" .. i];
-		local coin, match = false, false;
-		if merchantButton then merchantButton:SetAlpha(1); end
-		if index <= numItems then
-			local cat, soldOut = ClassifyMerchant(index);
-			if cat == "known" then
-				Tint(i, KNOWN, false);
-				-- Blizzard resets desaturation on every update, so no manual reset needed.
-				SetItemButtonDesaturated(_G["MerchantItem" .. i .. "ItemButton"], true);
-			elseif cat == "profession" then
-				Tint(i, PROFESSION_MISSING, false);
-			elseif cat == "never" then
-				Tint(i, NEVER_USABLE, false);
-			elseif cat == "skill" then
-				Tint(i, LEARNABLE, soldOut);
-			elseif cat == "expensive" then
-				Tint(i, TOO_EXPENSIVE, soldOut);
-			end
-			local missingCost = FirstMissingCost(GetMerchantCosts(index));
-			if missingCost then
-				coin = missingCost.gold and true or missingCost.texture;
-				if missingCost.gold then
-					SetMoneyFrameColor("MerchantItem" .. i .. "MoneyFrame", "red");
-				end
-			end
-			if merchantButton and not IsMerchantVisible(index, cat) then
-				merchantButton:SetAlpha(DIM_ALPHA);
-			end
-			local query = SearchText(merchantSearch);
-			local info = query ~= "" and C_MerchantFrame.GetItemInfo(index);
-			match = info and FuzzyMatch(info.name, query) or false;
-		end
-		SetCoinOn(_G["MerchantItem" .. i .. "ItemButton"], nil, coin and true or false, type(coin) ~= "boolean" and coin or nil);
-		SetCheckOn(_G["MerchantItem" .. i .. "ItemButton"], nil, index <= numItems and FitsMe(index) ~= nil, coin and true or false);
-		SyncIconAlpha(_G["MerchantItem" .. i .. "ItemButton"], merchantButton and merchantButton:GetAlpha() < 1);
-		SetMatchBorder(_G["MerchantItem" .. i .. "ItemButton"], nil, match);
+-- Buyback items: same checks, fed with the buyback tooltip, link and price.
+local function BuybackItemID(index)
+	local link = GetBuybackItemLink and GetBuybackItemLink(index);
+	if link and C_Item and C_Item.GetItemInfoInstant then return (C_Item.GetItemInfoInstant(link)); end
+	return nil;
+end
+
+-- Returns category, tooltip data, item ID, name, price.
+local function ClassifyBuyback(index)
+	local name, _, price, _, _, isUsable = GetBuybackItemInfo(index);
+	local data = C_TooltipInfo and C_TooltipInfo.GetBuybackItem and C_TooltipInfo.GetBuybackItem(index) or nil;
+	local itemID = BuybackItemID(index);
+	local cat;
+	if IsItemKnown(data, itemID) then
+		cat = "known";
+	else
+		local never, why = IsNeverUsableData(data);
+		local proficiency = GetProficiencyStateData(data, itemID);
+		if never and why == "profession" then cat = "profession";
+		elseif proficiency == "never" or never then cat = "never";
+		elseif proficiency == "learnable" then cat = "skill";
+		elseif isUsable and price and price > GetMoney() then cat = "expensive";
+		elseif not isUsable then cat = LevelTooLowData(data) and "level" or "other";
+		else cat = "normal"; end
 	end
-	UpdateMerchantPageHint();
+	return cat, data, itemID, name, price;
+end
+
+-- Window/search checks on tooltip data: returns visible, levelHidden, skillHidden.
+local function DataVisible(cat, data, itemID, name)
+	local levelHidden, skillHidden = false, false;
+	if db and db.merchantSkillWindow then
+		local need, have = SkillGapData(data);
+		skillHidden = need ~= nil and need > have + WindowSize("skill", "merchant");
+	end
+	if db and db.merchantLevelWindow then
+		local minLevel = MinLevelData(data, itemID);
+		levelHidden = minLevel ~= nil and minLevel > UnitLevel("player") + WindowSize("level", "merchant");
+	end
+	local query = SearchText(merchantSearch);
+	local searchOk = query == "" or (name ~= nil and FuzzyMatch(name, query));
+	return IsShownCategory("merchantShow", cat) and not levelHidden and not skillHidden and searchOk, levelHidden, skillHidden;
+end
+
+-- Everything a row shows for one entry: category, sold out, coin (true =
+-- gold, texture = other currency), visible, search match, fits me.
+local function MerchantEntryState(index, query)
+	local cat, soldOut = ClassifyMerchant(index);
+	local coin = false;
+	local missingCost = FirstMissingCost(GetMerchantCosts(index));
+	if missingCost then coin = missingCost.gold and true or missingCost.texture; end
+	local info = query ~= "" and C_MerchantFrame.GetItemInfo(index);
+	return cat, soldOut, coin, IsMerchantVisible(index, cat), info and FuzzyMatch(info.name, query) or false, FitsMe(index) ~= nil;
+end
+
+local function BuybackEntryState(index, query)
+	local cat, data, itemID, name, price = ClassifyBuyback(index);
+	local coin = price ~= nil and price > GetMoney();
+	local visible = DataVisible(cat, data, itemID, name);
+	local match = query ~= "" and name ~= nil and FuzzyMatch(name, query) or false;
+	return cat, false, coin, visible, match, FitsMeData(data, itemID) ~= nil;
+end
+
+-- Purple (epic) item names are hard to read in dimmed rows: only there the
+-- name ignores the row's alpha and uses a lighter purple. MerchantPlus puts
+-- the quality color into the text itself, so that color code is swapped too.
+local QUALITY_EPIC = (Enum.ItemQuality and Enum.ItemQuality.Epic) or 4;
+local EPIC_HEX, EPIC_DIM_HEX = "ffa335ee", "ffb86bf7";
+local DIM_EPIC_NAME_ALPHA = 0.35;
+local function IsEpicItem(itemID)
+	return itemID ~= nil and C_Item and C_Item.GetItemQualityByID and C_Item.GetItemQualityByID(itemID) == QUALITY_EPIC or false;
+end
+
+local function SetDimmedEpicName(fs, on)
+	if not fs then return; end
+	fs:SetIgnoreParentAlpha(on and true or false);
+	fs:SetAlpha(on and DIM_EPIC_NAME_ALPHA or 1);
+	if on then
+		if not fs.StickyFiltersNameColor then fs.StickyFiltersNameColor = { fs:GetTextColor() }; end
+		fs:SetTextColor(0.72, 0.42, 0.97);
+	elseif fs.StickyFiltersNameColor then
+		-- Restore only if nobody repainted the name since (Blizzard does on updates).
+		local r, g, b = fs:GetTextColor();
+		if math.abs(r - 0.72) < 0.01 and math.abs(g - 0.42) < 0.01 and math.abs(b - 0.97) < 0.01 then
+			fs:SetTextColor(unpack(fs.StickyFiltersNameColor));
+		end
+		fs.StickyFiltersNameColor = nil;
+	end
+	local text = fs:GetText();
+	if type(text) == "string" then
+		local from, to = on and EPIC_HEX or EPIC_DIM_HEX, on and EPIC_DIM_HEX or EPIC_HEX;
+		local swapped = text:gsub("|c" .. from, "|c" .. to);
+		if swapped ~= text then fs:SetText(swapped); end
+	end
+end
+
+local function TintMerchantRow(row, rowName, list, numItems, query, buyback)
+	local itemButton = row.ItemButton or _G[rowName .. "ItemButton"];
+	if not itemButton then return; end
+	local icon = list and row.SlotTexture or nil;
+	-- EllesmereUI list rows: icons on top of the item icon (1 unit to the left,
+	-- as before); tiles keep them half outside.
+	itemButton.StickyFiltersIconOutside = list and 0.1 or nil;
+	-- Empty slots keep their old ID: merchant slots are told apart by hasItem
+	-- (Blizzard, EllesmereUI list rows and expanded tiles all set it), buyback
+	-- slots by their shown item button.
+	local index;
+	if buyback then
+		index = itemButton:IsShown() and itemButton:GetID() or 0;
+		if index > 0 and not GetBuybackItemInfo(index) then index = 0; end
+	else
+		index = itemButton.hasItem and itemButton:GetID() or 0;
+	end
+	local coin, match, fits = false, false, false;
+	local nameFS = row.Name or _G[rowName .. "Name"];
+	local epicDimmed = false;
+	row:SetAlpha(1);
+	if index > 0 and index <= numItems then
+		local cat, soldOut, visible;
+		if buyback then
+			cat, soldOut, coin, visible, match, fits = BuybackEntryState(index, query);
+		else
+			cat, soldOut, coin, visible, match, fits = MerchantEntryState(index, query);
+		end
+		if buyback and cat ~= "known" and not list then
+			SetItemButtonDesaturated(itemButton, false);
+		end
+		if cat == "known" then
+			Tint(row, itemButton, KNOWN, false, list);
+			-- Blizzard and EllesmereUI reset desaturation on every update.
+			if list then
+				if row.SlotTexture then row.SlotTexture:SetDesaturated(true); end
+			else
+				SetItemButtonDesaturated(itemButton, true);
+			end
+		elseif cat == "profession" then
+			Tint(row, itemButton, PROFESSION_MISSING, false, list);
+		elseif cat == "never" then
+			Tint(row, itemButton, NEVER_USABLE, false, list);
+		elseif cat == "skill" then
+			Tint(row, itemButton, LEARNABLE, soldOut, list);
+		elseif cat == "expensive" then
+			Tint(row, itemButton, TOO_EXPENSIVE, soldOut, list);
+		end
+		if coin == true and _G[rowName .. "MoneyFrame"] then
+			SetMoneyFrameColor(rowName .. "MoneyFrame", "red");
+		end
+		if not visible then
+			row:SetAlpha(buyback and BUYBACK_DIM_ALPHA or DIM_ALPHA);
+			local itemID;
+			if buyback then itemID = BuybackItemID(index); else itemID = GetMerchantItemID(index); end
+			epicDimmed = IsEpicItem(itemID);
+		end
+	end
+	SetDimmedEpicName(nameFS, epicDimmed);
+	SetCoinOn(itemButton, icon, coin and true or false, type(coin) ~= "boolean" and coin or nil);
+	SetCheckOn(itemButton, icon, fits, coin and true or false);
+	SyncIconAlpha(itemButton, row:GetAlpha() < 1);
+	SetMatchBorder(itemButton, icon, match);
+end
+
+-- MerchantPlus: rows of its own scrolling table, recycled while scrolling, so
+-- every row gets its full state (including white / not desaturated).
+local BLIZZARD_RED = { 0.9, 0, 0 };
+local PLUS_COLORS = { known = KNOWN, profession = PROFESSION_MISSING, never = NEVER_USABLE, skill = LEARNABLE,
+	expensive = TOO_EXPENSIVE, level = BLIZZARD_RED, other = BLIZZARD_RED };
+-- Opacity of the whole-row color behind a MerchantPlus row.
+local PLUS_ROW_ALPHA = 0.3;
+
+local function PlusRowColorEnabled()
+	return not (db and db.plusRowColor == false);
+end
+
+local function TintMerchantPlusRow(row)
+	local index = MerchantPlusRowIndex(row);
+	if not index then return; end
+	local icon, nameFS;
+	for _, child in ipairs({ row:GetChildren() }) do
+		if child.Icon and child.IconBorder then icon, nameFS = child.Icon, child.Text; break; end
+	end
+	-- Cells not built yet: the deferred pass decorates the row later, so the
+	-- icons are never anchored to the row corner.
+	if not icon then return; end
+	-- The table rows are only 20 units high: icons 25% smaller.
+	row.StickyFiltersIconScale = 0.75;
+	-- Fully left of the small icon (merchant tiles: half outside).
+	row.StickyFiltersIconOutside = 1;
+	local query = SearchText(merchantSearch);
+	local cat, _, coin, visible, match, fits = MerchantEntryState(index, query);
+	local color = PLUS_COLORS[cat];
+	icon:SetVertexColor(color and color[1] or 1, color and color[2] or 1, color and color[3] or 1);
+	icon:SetDesaturated(cat == "known");
+	-- Whole row in the category color (option, on by default).
+	if not row.StickyFiltersRowTint then
+		local tint = row:CreateTexture(nil, "BACKGROUND", nil, 1);
+		tint:SetAllPoints(row);
+		row.StickyFiltersRowTint = tint;
+	end
+	if color and PlusRowColorEnabled() then
+		row.StickyFiltersRowTint:SetColorTexture(color[1], color[2], color[3], PLUS_ROW_ALPHA);
+		row.StickyFiltersRowTint:Show();
+	else
+		row.StickyFiltersRowTint:Hide();
+	end
+	row:SetAlpha(visible and 1 or DIM_ALPHA);
+	SetDimmedEpicName(nameFS, not visible and IsEpicItem(GetMerchantItemID(index)));
+	SetCoinOn(row, icon, coin and true or false, type(coin) ~= "boolean" and coin or nil);
+	SetCheckOn(row, icon, fits, coin and true or false);
+	SyncIconAlpha(row, row:GetAlpha() < 1);
+	-- Same animated search effect as on merchant tiles, around the square icon.
+	SetMatchBorder(row, icon, match);
+end
+
+local function TintMerchantPlusRows()
+	local list = _G.MerchantPlusItemList;
+	if not (MerchantPlusActive() and list and list.ScrollBox and list.ScrollBox.ForEachFrame) then return; end
+	list.ScrollBox:ForEachFrame(function(row)
+		local ok, err = pcall(TintMerchantPlusRow, row);
+		if not ok then Debug("MerchantPlus row", err); end
+	end);
+end
+
+local function TintMerchantItems()
+	if not MerchantFrame then return; end
+	local buyback = MerchantFrame.selectedTab == 2;
+	if MerchantFrame.selectedTab ~= 1 and not buyback then return; end
+	if not buyback then TintMerchantPlusRows(); end
+	local numItems = buyback and GetNumBuybackItems() or GetMerchantNumItems();
+	local query = SearchText(merchantSearch);
+	for _, set in ipairs(MERCHANT_ROW_SETS) do
+		local i = 1;
+		while _G[set.prefix .. i] do
+			local row = _G[set.prefix .. i];
+			-- IsVisible: EllesmereUI parks Blizzard's tiles in a hidden holder.
+			if row:IsVisible() then
+				TintMerchantRow(row, set.prefix .. i, set.list, numItems, query, buyback);
+			end
+			i = i + 1;
+		end
+	end
+	if buyback then
+		if merchantPageHint then merchantPageHint:SetText(""); end
+	else
+		UpdateMerchantPageHint();
+	end
 end
 
 ---------------------------------------------------------------------------
@@ -1285,6 +1581,22 @@ end;
 -- Explanations shown in gray under Missing/After buy.
 GetReasonLines = function(owner)
 	local lines = {};
+	local buybackIndex = GetBuybackIndexFromOwner(owner);
+	if buybackIndex then
+		local cat, data, itemID, name = ClassifyBuyback(buybackIndex);
+		if L["WHY_" .. cat:upper()] then lines[#lines + 1] = L["WHY_" .. cat:upper()]; end
+		local fits = FitsMeData(data, itemID);
+		if fits then lines[#lines + 1] = L["WHY_FITS_" .. fits:upper()]; end
+		local _, levelHidden, skillHidden = DataVisible(cat, data, itemID, name);
+		if not IsShownCategory("merchantShow", cat) then lines[#lines + 1] = L.DIM_CATEGORY; end
+		if levelHidden then lines[#lines + 1] = L.DIM_LEVEL:format(WindowSize("level", "merchant")); end
+		if skillHidden then lines[#lines + 1] = L.DIM_SKILL:format(WindowSize("skill", "merchant")); end
+		local query = SearchText(merchantSearch);
+		if query ~= "" then
+			lines[#lines + 1] = (name and FuzzyMatch(name, query)) and L.SEARCH_MATCH or L.DIM_SEARCH;
+		end
+		return lines;
+	end
 	local index = GetMerchantIndexFromOwner(owner);
 	if index then
 		local cat = ClassifyMerchant(index);
@@ -1461,6 +1773,42 @@ local function HintEnabled(key)
 	return not (db and db.hintOff and db.hintOff[key]);
 end
 
+-- EllesmereUI skinning API: our own controls (search boxes, filter buttons,
+-- hint boxes) get the user's EllesmereUI look. The callback runs at login and
+-- only while the user keeps third-party skinning on for StickyFilters;
+-- controls created before or after it are queued or skinned directly.
+local euiSkin;
+local skinQueue = {};
+local function ApplySkin(S, kind, frame)
+	if kind == "editbox" and S.EditBox then S.EditBox(frame);
+	elseif kind == "dropdown" and S.Dropdown then S.Dropdown(frame);
+	elseif kind == "button" and S.Button then S.Button(frame);
+	elseif kind == "close" and S.CloseButton then S.CloseButton(frame);
+	elseif kind == "panel" and S.Panel then
+		if frame.ClearBackdrop then frame:ClearBackdrop(); end
+		S.Panel(frame);
+	end
+end
+
+local function Skin(kind, frame)
+	if not frame then return; end
+	if euiSkin then
+		pcall(ApplySkin, euiSkin, kind, frame);
+	else
+		skinQueue[#skinQueue + 1] = { kind, frame };
+	end
+end
+
+if EllesmereUI and EllesmereUI.RegisterSkin then
+	EllesmereUI.RegisterSkin(ADDON_NAME, function(S)
+		euiSkin = S;
+		for _, entry in ipairs(skinQueue) do
+			pcall(ApplySkin, S, entry[1], entry[2]);
+		end
+		skinQueue = {};
+	end);
+end
+
 local function CreateHint(parent, target, key, text)
 	local hint = CreateFrame("Frame", nil, parent, "BackdropTemplate");
 	hint:SetSize(230, 74);
@@ -1486,8 +1834,11 @@ local function CreateHint(parent, target, key, text)
 	FitHeight();
 	hint:SetScript("OnShow", FitHeight);
 	-- Blizzard's help-plate arrow (points down in the file), rotated to point
-	-- left at the target; it gently bobs left and right.
-	local arrow = hint:CreateTexture(nil, "OVERLAY");
+	-- left at the target; it gently bobs left and right. It lives on its own
+	-- child frame: skins (EllesmereUI's panel) fade every texture of the hint.
+	local arrowHolder = CreateFrame("Frame", nil, hint);
+	arrowHolder:SetAllPoints(hint);
+	local arrow = arrowHolder:CreateTexture(nil, "OVERLAY");
 	arrow:SetTexture("Interface\\TalentFrame\\TalentFrame-Parts");
 	arrow:SetTexCoord(0.78515625, 0.99218750, 0.54687500, 0.58789063);
 	arrow:SetSize(30, 12);
@@ -1516,6 +1867,9 @@ local function CreateHint(parent, target, key, text)
 		db.hintOff[key] = true;
 		hint:Hide();
 	end);
+	Skin("panel", hint);
+	Skin("close", close);
+	Skin("button", never);
 	hint:Hide();
 	parent:HookScript("OnShow", function()
 		hint:SetShown(HintEnabled(key) and not hintClosed[key]);
@@ -1540,6 +1894,7 @@ local function CreateSearchBox(parent, onChange)
 	box:SetAutoFocus(false);
 	if box.Instructions then box.Instructions:SetText(L.SEARCH); end
 	box:HookScript("OnTextChanged", onChange);
+	Skin("editbox", box);
 	return box;
 end
 
@@ -1559,6 +1914,7 @@ local function CreateMerchantUI()
 	merchantSearch = CreateSearchBox(MerchantFrame, RefreshMerchant);
 	merchantSearch:SetPoint("BOTTOMRIGHT", MerchantFrame, "TOPRIGHT", -6, 2);
 	local dropdown = CreateFrame("DropdownButton", nil, MerchantFrame, "WowStyle1FilterDropdownTemplate");
+	Skin("dropdown", dropdown);
 	merchantSearch:ClearAllPoints();
 	merchantSearch:SetPoint("BOTTOMRIGHT", MerchantFrame, "TOPRIGHT", -102, 2);
 	dropdown:SetPoint("LEFT", merchantSearch, "RIGHT", 6, 0);
@@ -1608,6 +1964,7 @@ local function InstallTrainerHook()
 	trainerSearch:SetPoint("BOTTOMRIGHT", ClassTrainerFrame, "TOPRIGHT", -102, 2);
 	-- Own filter button (same as the merchant); Blizzard's trainer menu stays untouched.
 	local trainerDropdown = CreateFrame("DropdownButton", nil, ClassTrainerFrame, "WowStyle1FilterDropdownTemplate");
+	Skin("dropdown", trainerDropdown);
 	trainerDropdown:SetPoint("LEFT", trainerSearch, "RIGHT", 6, 0);
 	trainerDropdown:SetWidth(90);
 	trainerDropdown:SetText(L.FILTER);
@@ -1635,16 +1992,73 @@ end
 -- Installed on PLAYER_LOGIN (after all addons loaded) so this hook runs after
 -- other addons' hooks (e.g. WhatsTraining tints known tomes dark red) and the
 -- "known" gray wins.
+local function SafeTintMerchantItems()
+	local ok, err = pcall(TintMerchantItems);
+	if not ok and err ~= lastError then
+		lastError = err;
+		print("|cffff4040StickyFilters " .. L.ERROR .. ":|r " .. tostring(err));
+	end
+end
+
+-- EllesmereUI fills its list one frame after MerchantFrame_Update and refills
+-- its expanded tiles on page flips without one. One extra pass two frames
+-- later (debounced) runs after both.
+local deferredTintPending = false;
+local function DeferredTint()
+	if deferredTintPending or not (C_Timer and C_Timer.After) then return; end
+	deferredTintPending = true;
+	C_Timer.After(0, function()
+		C_Timer.After(0, function()
+			deferredTintPending = false;
+			if MerchantFrame and MerchantFrame:IsShown() then SafeTintMerchantItems(); end
+		end);
+	end);
+end
+
+-- Money, learned recipes and bag contents change coins, "known" and buyback
+-- entries without a merchant update; re-tint while the window is open.
+local merchantEventFrame = CreateFrame("Frame");
+for _, event in ipairs({ "PLAYER_MONEY", "NEW_RECIPE_LEARNED", "BAG_UPDATE_DELAYED", "CURRENCY_DISPLAY_UPDATE" }) do
+	pcall(merchantEventFrame.RegisterEvent, merchantEventFrame, event);
+end
+merchantEventFrame:SetScript("OnEvent", function()
+	if MerchantFrame and MerchantFrame:IsShown() then DeferredTint(); end
+end);
+
 local function InstallMerchantHook()
 	CreateMerchantUI();
 	hooksecurefunc("MerchantFrame_UpdateMerchantInfo", function()
 		Debug("tint pass, page", MerchantFrame and MerchantFrame.page);
-		local ok, err = pcall(TintMerchantItems);
-		if not ok and err ~= lastError then
-			lastError = err;
-			print("|cffff4040StickyFilters " .. L.ERROR .. ":|r " .. tostring(err));
-		end
+		SafeTintMerchantItems();
 	end);
+	-- Buyback tab: clears our dimming and icons from the reused tiles.
+	if MerchantFrame_UpdateBuybackInfo then hooksecurefunc("MerchantFrame_UpdateBuybackInfo", SafeTintMerchantItems); end
+	-- MerchantPlus: tint a row whenever its item cell is filled (every time the
+	-- scroll box reuses the row for another item while scrolling), and all
+	-- rows after a refresh (search, filter or merchant update). The cell mixin
+	-- is copied into each cell when MerchantPlus builds it (after login), so a
+	-- hook on the mixin table reaches every cell.
+	local plusList = _G.MerchantPlusItemList;
+	if _G.MerchantPlusTableItemMixin and MerchantPlusTableItemMixin.Populate then
+		hooksecurefunc(MerchantPlusTableItemMixin, "Populate", function(cell)
+			local row = cell.GetParent and cell:GetParent();
+			local ok, err = pcall(TintMerchantPlusRow, row);
+			if not ok then Debug("MerchantPlus row", err); end
+			-- Safety net in case the row's element data is bound after its cells.
+			DeferredTint();
+		end);
+	end
+	if plusList then
+		for _, method in ipairs({ "RefreshScrollFrame", "SetSortOrder", "UpdateTableBuilderLayout" }) do
+			if plusList[method] then hooksecurefunc(plusList, method, DeferredTint); end
+		end
+		if _G.MerchantPlusFrame then MerchantPlusFrame:HookScript("OnShow", DeferredTint); end
+	end
+	hooksecurefunc("MerchantFrame_Update", DeferredTint);
+	if _G.EllesmereUI then
+		-- Called for every row EllesmereUI fills (list and expanded tiles).
+		if MerchantFrameItem_UpdateQuality then hooksecurefunc("MerchantFrameItem_UpdateQuality", DeferredTint); end
+	end
 end
 
 -- Dumps the current merchant page into StickyFiltersDB.dump (written to
@@ -1707,6 +2121,8 @@ end
 -- Tooltips for the options page: { English, German }. Each explains the
 -- setting and gives an example.
 local TIPS = {
+	plus_row = { "In MerchantPlus' list tab the whole row gets a light tint in the item's color, not only the icon.\nExample: a row with plate armor for a mage is tinted dark red.",
+		"Im Listen-Reiter von MerchantPlus bekommt die ganze Zeile einen leichten Farbton in der Farbe des Items, nicht nur das Icon.\nBeispiel: eine Zeile mit Plattenr\195\188stung f\195\188r einen Magier wird dunkelrot get\195\182nt." },
 	quest_colors = { "Same colors as at merchants, in the quest log and when you accept or turn in a quest.\nExample: plate armor for a mage is dark red.",
 		"Gleiche Farben wie beim H\195\164ndler, im Questlog und beim Annehmen oder Abgeben einer Quest.\nBeispiel: Plattenr\195\188stung f\195\188r einen Magier ist dunkelrot." },
 	quest_check = { "Green check on rewards that fit you, with the criteria from the Merchant page.\nExample: a leather chest for a rogue.",
@@ -1890,6 +2306,11 @@ local function CreateOptionsPanel()
 	end
 	Header(mLayout, L.OPT_SEC_SEARCH);
 	SearchSettings(mCat, "merchant");
+	if C_AddOns and C_AddOns.IsAddOnLoaded and C_AddOns.IsAddOnLoaded("MerchantPlus") then
+		Header(mLayout, "MerchantPlus");
+		local plusGet, plusSet = Flag("plusRowColor", true);
+		Checkbox(mCat, L.OPT_PLUS_ROW, true, plusGet, plusSet, Tip("plus_row"));
+	end
 
 	-- Trainer page
 	local tCat, tLayout = Settings.RegisterVerticalLayoutSubcategory(category, L.OPT_TRAINER);

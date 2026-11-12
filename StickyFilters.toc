@@ -8,5 +8,6 @@
 ## X-Curse-Project-ID: 1796104
 ## X-Website: https://www.curseforge.com/wow/addons/stickyfilters
 ## SavedVariables: StickyFiltersDB
+## OptionalDeps: EllesmereUI, EllesmereUIBlizzardSkin, MerchantPlus
 
 StickyFilters.lua
