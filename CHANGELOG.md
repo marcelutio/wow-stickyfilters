@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.1
+
+- Fix: learning pet skills with Beast Training was blocked ("StickyFilters has been blocked from an action only available to the Blizzard UI"). StickyFilters no longer rebuilds Blizzard's trainer list from addon code; search and filters only recolor and dim the visible rows, and at pet trainers Blizzard's own filters are left as they are
+- Blizzard's own trainer filter menu still opens to the right, now without touching Blizzard's menu data (the old way could cause the same block)
+
 ## 1.2.0
 
 - EllesmereUI merchant skin: colors, dimming, icons, search highlight and tooltips also work in its "Show As List" and expanded vendor views; the page hint follows the expanded view's page size

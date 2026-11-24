@@ -43,7 +43,7 @@ The **crossed-out coin** appears on everything you cannot afford, in every color
 
 ### Trainers
 
-- **Remembered Blizzard filters:** "Available", "Unavailable", "Already known" and "Categorize" are saved account-wide and re-applied at every trainer. Changes made by other addons (for example ones that switch all filters on to scan the list) are reverted automatically.
+- **Remembered Blizzard filters:** "Available", "Unavailable", "Already known" and "Categorize" are saved account-wide and re-applied at every trainer (not at pet trainers / Beast Training, where Blizzard's filters stay untouched so pet skills can be learned). Changes made by other addons (for example ones that switch all filters on to scan the list) are reverted automatically.
 - **Own search box and filter menu** with the same categories and range filters as merchants. Blizzard's own trainer menu stays untouched.
 
 ### Quest rewards

@@ -242,8 +242,20 @@ end
 -- Trainer
 ---------------------------------------------------------------------------
 
+-- Pet training (Beast Training) buys through a protected call. Changing the
+-- filters makes the client rebuild the trainer list inside our (addon) call,
+-- which taints the data the "Train" button reads and gets the purchase
+-- blocked. So at pet trainers StickyFilters never changes Blizzard's filters.
+-- Fails closed: an unknown trainer type counts as pet (the deferred re-check
+-- one frame later applies the filters at class trainers anyway).
+local function IsPetTrainer()
+	if not (C_Trainer and C_Trainer.GetTrainerType and Enum.TrainerType) then return false; end
+	local trainerType = C_Trainer.GetTrainerType();
+	return trainerType == nil or trainerType == Enum.TrainerType.Pet;
+end
+
 local function ApplyTrainerFilters(source)
-	if not db then return; end
+	if not db or IsPetTrainer() then return; end
 	applying = true;
 	for _, filter in ipairs(TRAINER_FILTERS) do
 		local wanted = db.trainer[filter];
@@ -1709,14 +1721,18 @@ local function HookSearchPersistence(box, frame, key)
 			if tbl then tbl[slot] = self:GetText() ~= "" and self:GetText() or nil; end
 		end
 	end);
-	frame:HookScript("OnShow", function()
+	local function Restore()
 		local saved = "";
 		if SearchSaved(key) then
 			local tbl, slot = SavedSearchSlot(key);
 			saved = tbl and tbl[slot] or "";
 		end
 		if box:GetText() ~= saved then box:SetText(saved); end
-	end);
+	end
+	frame:HookScript("OnShow", Restore);
+	-- Installed while the frame is already open (trainer UI hooks are set up
+	-- one frame after it loaded): restore right away.
+	if frame:IsShown() then Restore(); end
 	frame:HookScript("OnHide", function()
 		if not SearchSaved(key) and box:GetText() ~= "" then box:SetText(""); end
 	end);
@@ -1871,9 +1887,11 @@ local function CreateHint(parent, target, key, text)
 	Skin("close", close);
 	Skin("button", never);
 	hint:Hide();
-	parent:HookScript("OnShow", function()
+	local function UpdateShown()
 		hint:SetShown(HintEnabled(key) and not hintClosed[key]);
-	end);
+	end
+	parent:HookScript("OnShow", UpdateShown);
+	if parent:IsShown() then UpdateShown(); end
 	parent:HookScript("OnHide", function() hint:Hide(); end);
 	return hint;
 end
@@ -1902,9 +1920,24 @@ local function RefreshMerchant()
 	if MerchantFrame and MerchantFrame:IsShown() then MerchantFrame_Update(); end
 end
 
+-- Re-tints the visible trainer rows only. Never calls ClassTrainerFrame_Update:
+-- running Blizzard's list rebuild from addon code taints the trainer data and
+-- blocks protected purchases (pet training).
 local function RefreshTrainer()
-	if ClassTrainerFrame and ClassTrainerFrame:IsShown() and ClassTrainerFrame_Update then
-		ClassTrainerFrame_Update(true);
+	local box = ClassTrainerFrame and ClassTrainerFrame:IsShown() and ClassTrainerFrame.ScrollBox;
+	if not (box and box.ForEachFrame) then return; end
+	box:ForEachFrame(function(frame)
+		local data = frame.GetElementData and frame:GetElementData();
+		local ok, err = pcall(TintTrainerButton, frame, data);
+		if not ok then Debug("trainer row", err); end
+	end);
+	-- Profession "learning step" row sits outside the scroll box.
+	local step = ClassTrainerFrame.skillStepButton;
+	local stepIndex = GetTrainerServiceStepIndex and GetTrainerServiceStepIndex();
+	if step and step:IsShown() and stepIndex then
+		local ok, err = pcall(TintTrainerButton, step, { skillIndex = stepIndex,
+			trainerType = C_Trainer and C_Trainer.GetTrainerType and C_Trainer.GetTrainerType() });
+		if not ok then Debug("trainer step", err); end
 	end
 end
 
@@ -1980,10 +2013,18 @@ local function InstallTrainerHook()
 		SaveSearchCheckbox(rootDescription, "trainer", RefreshTrainer);
 		HintCheckbox(rootDescription, "trainer");
 	end);
-	-- Blizzard's trainer filter menu opens to the right instead of over the list.
+	-- Blizzard's own trainer filter menu opens to the right of its button. The
+	-- opened menu is moved in a secure post-hook; writing a custom anchor into
+	-- Blizzard's dropdown (SetMenuAnchor) would taint the menu, and a filter
+	-- change made through a tainted menu blocks pet training purchases.
 	local tdd = ClassTrainerFrame.FilterDropdown;
-	if tdd and tdd.SetMenuAnchor and AnchorUtil then
-		tdd:SetMenuAnchor(AnchorUtil.CreateAnchor("TOPLEFT", tdd, "TOPRIGHT", 2, 0));
+	if tdd and tdd.OnMenuOpened then
+		hooksecurefunc(tdd, "OnMenuOpened", function(self, menu)
+			if menu and menu.ClearAllPoints then
+				menu:ClearAllPoints();
+				menu:SetPoint("TOPLEFT", self, "TOPRIGHT", 2, 0);
+			end
+		end);
 	end
 	HookSearchPersistence(trainerSearch, ClassTrainerFrame, "trainer");
 	CreateHint(ClassTrainerFrame, trainerDropdown, "trainer", L.HINT_TRAINER);
@@ -2411,14 +2452,14 @@ SlashCmdList.STICKYFILTERS = function(msg)
 		print(("|cff40c0ffStickyFilters|r %s: %s %s, %s %s"):format(L.ICONS, L.ICON_COIN, b(IconEnabled("coin")), L.ICON_CHECK, b(IconEnabled("check"))));
 		print("  /sf icons coin | check | on | off");
 		if MerchantFrame and MerchantFrame:IsShown() then MerchantFrame_Update(); end
-		if ClassTrainerFrame and ClassTrainerFrame:IsShown() and ClassTrainerFrame_Update then ClassTrainerFrame_Update(true); end
+		RefreshTrainer();
 		return;
 	elseif cmd == "reset" then
 		for k in pairs(StickyFiltersDB) do StickyFiltersDB[k] = nil; end
 		ApplyFirstRunDefaults(StickyFiltersDB);
 		ApplyTrainerFilters("reset");
 		if MerchantFrame and MerchantFrame:IsShown() then MerchantFrame_Update(); end
-		if ClassTrainerFrame and ClassTrainerFrame:IsShown() and ClassTrainerFrame_Update then ClassTrainerFrame_Update(true); end
+		RefreshTrainer();
 		print("|cff40c0ffStickyFilters|r " .. L.RESET_DONE);
 		return;
 	elseif cmd == "debug" then
@@ -2477,7 +2518,13 @@ frame:SetScript("OnEvent", function(self, event, arg1)
 				end
 			end
 		elseif arg1 == "Blizzard_TrainerUI" then
-			InstallTrainerHook();
+			-- One frame later: this event fires inside Blizzard's load of the
+			-- trainer UI, right before it opens; nothing of ours should run in
+			-- that chain (pet training purchases are protected).
+			C_Timer.After(0, function()
+				InstallTrainerHook();
+				RefreshTrainer();
+			end);
 		end
 		return;
 	elseif event == "PLAYER_LOGIN" then
